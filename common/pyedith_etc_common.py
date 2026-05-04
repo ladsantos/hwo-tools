@@ -152,7 +152,7 @@ class pyEDITHETC():
         if "new_telescope_diameter" in newvalues.data:
             print("Changed Telescope Diameter")
             self.parameters["diameter"] = newvalues.data["new_telescope_diameter"][0]
-            del newvalues.data["new_diameter"] # consume the new value
+            del newvalues.data["new_telescope_diameter"] # consume the new value
         else:
             self.parameters["observatory_preset"] = "EAC1" # tells ETC to use EAC1 yaml files throughputs
 
