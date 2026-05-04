@@ -25,6 +25,8 @@ import stsynphot as stsyn
 
 spectra_library = copy.deepcopy(syn_spectra_library)
 
+FLUXUNIT = u.ABmag
+
 hri_source = None
 hri_exp = None
 hri = None
@@ -103,8 +105,11 @@ snr_plot.scatter('x', 'y', source=source2, fill_color='white', line_color='orang
 snr_plot.line('x', 'y', source=source3, line_width=3, line_color='red', line_alpha=1.0)
 snr_plot.scatter('x', 'y', source=source3, fill_color='white', line_color='red', size=8) 
 
-spectrum_template = ColumnDataSource(data=dict(w=spectra_library[template_to_start_with].waveset.value, 
-                                               f=spectra_library[template_to_start_with](spectra_library[template_to_start_with].waveset).value)) 
+#hri_source = spectra_library[template_to_start_with]
+flux_converted = syn.units.convert_flux(hri_source.sed.waveset, hri_source.sed(hri_source.sed.waveset), FLUXUNIT)
+
+spectrum_template = ColumnDataSource(data=dict(w=hri_source.sed.waveset.value, 
+                                               f=flux_converted.value))
 
 sed_plot = figure(height=400, width=700,tools="crosshair,pan,reset,save,box_zoom,wheel_zoom",
               x_range=[800, 24000], y_range=[35, 21], border_fill_color='black', toolbar_location='right')
@@ -127,7 +132,9 @@ def update_data(attrname, old, new):
     print('SED Waveunits: ', hri_source.sed.waveset.unit)
     print('SED Fluxunits: ', hri_source.sed(hri_source.sed.waveset).unit)
     
-    spectrum_template.data = {'w':hri_source.sed.waveset.value, 'f':hri_source.sed(hri_source.sed.waveset).value}    
+    flux_converted = syn.units.convert_flux(hri_source.sed.waveset, hri_source.sed(hri_source.sed.waveset), FLUXUNIT)
+
+    spectrum_template.data = {'w':hri_source.sed.waveset.value, 'f':flux_converted.value}    
 
     hri_exp.exptime = [[exptime.value, exptime.value, exptime.value, 
                         exptime.value, exptime.value, exptime.value, 
@@ -141,8 +148,8 @@ def update_data(attrname, old, new):
     snr_plot.y_range.start = 0
     snr_plot.y_range.end = 1.3*np.max([np.max(hri_exp.snr.value),5.]) 
 
-    sed_plot.y_range.start = np.min(hri_source.sed(hri_source.sed.waveset).value)+5. 
-    sed_plot.y_range.end = np.min(hri_source.sed(hri_source.sed.waveset).value)-5. 
+    sed_plot.y_range.start = np.max(flux_converted.value)+5. 
+    sed_plot.y_range.end = np.min(flux_converted.value)-5. 
     text = 'Normalized to ' + str(magnitude.value) + ' in the ' + str(spectra_library[template.value].band) + ' band'
     sed_plot.title.text = text
     warning.text = ""
