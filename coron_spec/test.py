@@ -1,12 +1,17 @@
 import sys
+import os
 import pickle
 
 import pytest
 import numpy as np
 from bokeh.models import ColumnDataSource
 
-from main import do_recalculate_snr, load_initial
-import catalog
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/..")
+
+from common import catalog
+from main import CoronSpec
+
 
 from syotools.spectra.spec_defaults import syn_spectra_library
 
@@ -92,8 +97,8 @@ def check_relative_diff(actual, expected, rel_tol=0.1):
 
     return all_within_tolerance
 
-
-load_initial()
+coron_spec = CoronSpec()
+coron_spec.load_initial()
 
 class item():
     def __init__(self, value=30):
@@ -137,7 +142,7 @@ def do_comparisons(inputs):
     delta_mag = inputs[6]
     new_values = ColumnDataSource(data={"new_snr": [snr], "new_exp": [exptime], "new_diameter": [diameter], "new_star": [star], "new_distance": [distance], 
                   "new_planet": [planet], "delta_mag": [delta_mag], "observation": [True], "observatory": [True], "scene": [True]})
-    obsdata = do_recalculate_snr(new_values)
+    obsdata = coron_spec.do_recalculate_snr(new_values)
 
     print(obsdata)
 
