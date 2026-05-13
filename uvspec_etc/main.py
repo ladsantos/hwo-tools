@@ -30,6 +30,8 @@ snr_results = ColumnDataSource(data={})
 spectrum_template = ColumnDataSource(data={})
 instrument_info = ColumnDataSource(data={})
 
+FLUXUNIT = u.erg / u.s / u.cm**2 / u.AA
+
 def initialize_setup():
     global hwo
     global uvi
@@ -56,7 +58,8 @@ def initialize_setup():
     uvi.add_exposure(uvi_exp) 
     uvi_exp._update_snr(uvi_source) 
 
-    spectrum_template = ColumnDataSource(data=dict(w=uvi_source.sed.waveset.value, f=uvi_source.sed(uvi_source.sed.waveset).value)) 
+    spectrum_template = ColumnDataSource(data=dict(w=uvi_source.sed.waveset.value, 
+                                                   f=syn.units.convert_flux(uvi_source.sed.waveset, uvi_source.sed(uvi_source.sed.waveset), FLUXUNIT).value)) 
     print(' flux = ', uvi_source.sed(uvi_source.sed.waveset))
 
     snr_results = ColumnDataSource(data=dict(w=uvi.wave.value, sn = uvi_exp.snr.value)) 
@@ -115,13 +118,14 @@ def update_data(attrname, old, new): # use this one for updating pysynphot templ
     uvi_exp._update_snr(uvi_source) 
 
     snr_fixed = np.nan_to_num(uvi_exp.snr.value, nan=0)
+    flux_converted = syn.units.convert_flux(uvi_source.sed.waveset, uvi_source.sed(uvi_source.sed.waveset), FLUXUNIT)
 
-    spectrum_template.data = dict(w=uvi_source.sed.waveset.value, f=uvi_source.sed(uvi_source.sed.waveset).value) 
+    spectrum_template.data = dict(w=uvi_source.sed.waveset.value, f=flux_converted.value) 
     snr_results.data = dict(w=uvi.wave.value, sn = snr_fixed) 
 
     # set the axes to autoscale appropriately 
     flux_plot.y_range.start = 0 
-    flux_plot.y_range.end = 1.5*np.max(uvi_source.sed(uvi_source.sed.waveset).value)
+    flux_plot.y_range.end = 1.5*np.max(flux_converted.value)
     sn_plot.y_range.start = 0 
     sn_plot.y_range.end = 1.3*np.max(snr_results.data['sn'])
 

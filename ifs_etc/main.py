@@ -24,6 +24,8 @@ from syotools.models import Telescope, IFS, Source, SourceIFSExposure
 
 spectra_library = copy.deepcopy(syn_spectra_library)
 
+FLUXUNIT = u.erg / u.s / u.cm**2 / u.AA
+
 hwo = None
 ifs = None
 ifs_exp = None
@@ -63,7 +65,8 @@ def update_data(attrname, old, new): # use this one for updating synphot templat
     global sources
     # blank out the old list of sources
     ifs_exp.sources = []
-    max_val = 0
+    all_fluxes = []
+    max_val = np.asarray([0.0])
     for idx, panel in enumerate(sources):
         template = panel.template
         redshift = panel.redshift
@@ -80,8 +83,6 @@ def update_data(attrname, old, new): # use this one for updating synphot templat
         ifs_source = Source() 
         ifs_source.set_sed(template.value, magnitude.value, redshift.value, 0., library=spectra_library)
 
-        max_val = np.max([np.max(ifs_source.sed(ifs_source.sed.waveset).value),max_val])
-
         if ('Blackbody' in template.value):      #<---- update the blackbody curve here. 
             wave = np.linspace(100,30000,300) << u.Angstrom
             bb = syn.spectrum.SourceSpectrum(syn.models.BlackBody1D, bb_temperature.value)
@@ -89,10 +90,17 @@ def update_data(attrname, old, new): # use this one for updating synphot templat
             bb = bb.normalize(magnitude.value * u.ABmag, stsyn.band('galex,fuv')) 
             ifs_source.sed = syn.spectrum.SourceSpectrum(syn.models.Empirical1D, points=wave << u.Angstrom, lookup_table=bb(wave))
 
-        spectrum_template[idx].data = dict(w=ifs_source.sed.waveset.value, f=ifs_source.sed(ifs_source.sed.waveset).value)
+        flux_converted = syn.units.convert_flux(ifs_source.sed.waveset, ifs_source.sed(ifs_source.sed.waveset), FLUXUNIT)
+        print("Flux_converted", flux_converted.value)
+
+        all_fluxes.extend(flux_converted.value)
+
+        spectrum_template[idx].data = dict(w=ifs_source.sed.waveset.value, f=flux_converted.value)
         print(len(spectrum_template))
 
         ifs_exp.add_source(ifs_source)
+
+    max_val = np.ma.max(all_fluxes)
 
     ifs_exp.exptime = [[exptime.value, exptime.value, exptime.value, exptime.value, exptime.value, exptime.value, exptime.value, exptime.value, exptime.value, exptime.value], 'hr'] 
     ifs_exp.verbose = True 
@@ -126,21 +134,12 @@ class source_widget():
         self.template.on_change("value", update_data)
 
         self.redshift = Slider(title="Redshift", value=0.0, start=0., end=3.0, step=0.05, width=200)
-        self.redshift_callback = CustomJS(args=dict(source=self.redshift), code="""
-                source.data = { value: [cb_obj.value] }
-            """)
-        self.redshift.js_on_change("value_throttled", self.redshift_callback)
+        self.redshift.on_change("value", update_data)
 
         self.magnitude = Slider(title="AB Magnitude", value=21., start=15., end=30.0, step=0.1, width=200)
-        self.magnitude_callback = CustomJS(args=dict(source=self.magnitude), code="""
-                source.data = { value: [cb_obj.value] }
-            """)
-        self.magnitude.js_on_change("value_throttled", self.magnitude_callback)
+        self.magnitude.on_change("value", update_data)
 
         self.bb_temperature = Slider(title="Blackbody Temperature [K]", value=10000., start=3000., end=200000.0, step=1000., width=200)
-        self.temperature_callback = CustomJS(args=dict(source=self.bb_temperature), code="""
-                source.data = { value: [cb_obj.value] }
-            """)
         self.bb_temperature.on_change("value", update_data)
 
         self.upload = FileInput(accept=[".txt", ".csv", ".ascii", ".fit", ".fits", ".asdf"], title="Upload a Spectrum (.txt or FITS format, 10 MiB max)", directory=False, multiple=False) # 1. list allowed extensions
@@ -257,12 +256,12 @@ add_source.on_click(add_source_callback)
 aperture_callback = CustomJS(args=dict(source=source), code="""
     source.data = { value: [cb_obj.value] }
 """)
-aperture.js_on_change("value_throttled", aperture_callback) 
+aperture.on_change('value', update_data)
 
 exptime_callback = CustomJS(args=dict(source=source), code="""
     source.data = { value: [cb_obj.value] }
 """)
-exptime.js_on_change("value_throttled", exptime_callback)
+exptime.on_change('value', update_data)
  
 
 exposure_inputs = column(children=[grating, aperture, exptime], sizing_mode='fixed', max_width=300, width=300, height=600 )
